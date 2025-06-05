@@ -16,12 +16,12 @@ class MAPPO_Clip_Learner(IPPO_Learner):
                  config: Namespace,
                  model_keys: List[str],
                  agent_keys: List[str],
-                 policy: nn.Module):
-        super(MAPPO_Clip_Learner, self).__init__(config, model_keys, agent_keys, policy)
+                 policy: nn.Module,
+                 callback):
+        super(MAPPO_Clip_Learner, self).__init__(config, model_keys, agent_keys, policy, callback)
 
     def update(self, sample):
         self.iterations += 1
-        info = {}
 
         # prepare training data
         sample_Tensor = self.build_training_data(sample=sample,
@@ -57,6 +57,10 @@ class MAPPO_Clip_Learner(IPPO_Learner):
             else:
                 joint_obs = self.get_joint_input(obs)
                 critic_input = {k: joint_obs for k in self.agent_keys}
+
+        info = self.callback.on_update_start(self.iterations, method="update",
+                                             policy=self.policy, sample_Tensor=sample_Tensor, bs=bs,
+                                             critic_input=critic_input)
 
         # feedforward
         _, pi_dists_dict = self.policy(observation=obs, agent_ids=IDs, avail_actions=avail_actions)
@@ -112,6 +116,12 @@ class MAPPO_Clip_Learner(IPPO_Learner):
                 f"{key}/entropy": loss_e[-1].item(),
                 f"{key}/predict_value": value_pred_i.mean().item()
             })
+            info.update(self.callback.on_update_agent_wise(self.iterations, key, info=info, method="update",
+                                                           mask_values=mask_values, log_pi=log_pi, ratio=ratio,
+                                                           surrogate1=surrogate1, surrogate2=surrogate2,
+                                                           entropy=entropy,
+                                                           value_pred_i=value_pred_i, value_target=value_target,
+                                                           values_i=values_i, loss_v=loss_v))
 
         loss = sum(loss_a) + self.vf_coef * sum(loss_c) - self.ent_coef * sum(loss_e)
         self.optimizer.zero_grad()
@@ -131,15 +141,17 @@ class MAPPO_Clip_Learner(IPPO_Learner):
             "loss": loss.item(),
         })
 
+        info.update(self.callback.on_update_end(self.iterations, method="update", policy=self.policy, info=info))
+
         return info
 
     def update_rnn(self, sample):
         self.iterations += 1
-        info = {}
 
         sample_Tensor = self.build_training_data(sample=sample,
                                                  use_parameter_sharing=self.use_parameter_sharing,
-                                                 use_actions_mask=self.use_actions_mask)
+                                                 use_actions_mask=self.use_actions_mask,
+                                                 use_global_state=self.use_global_state)
         batch_size = sample_Tensor['batch_size']
         state = sample_Tensor['state']
         bs_rnn = batch_size * self.n_agents if self.use_parameter_sharing else batch_size
@@ -172,6 +184,9 @@ class MAPPO_Clip_Learner(IPPO_Learner):
             else:
                 joint_obs = self.get_joint_input(obs, (batch_size, seq_len, -1))
                 critic_input = {k: joint_obs for k in self.agent_keys}
+
+        info = self.callback.on_update_start(self.iterations, method="update_rnn", policy=self.policy,
+                                             sample_Tensor=sample_Tensor, bs_rnn=bs_rnn, critic_input=critic_input)
 
         rnn_hidden_actor = {k: self.policy.actor_representation[k].init_hidden(bs_rnn) for k in self.model_keys}
         rnn_hidden_critic = {k: self.policy.critic_representation[k].init_hidden(bs_rnn) for k in self.model_keys}
@@ -231,6 +246,13 @@ class MAPPO_Clip_Learner(IPPO_Learner):
                 f"{key}/predict_value": value_pred_i.mean().item()
             })
 
+            info.update(self.callback.on_update_agent_wise(self.iterations, key, info=info, method="update_rnn",
+                                                           mask_values=mask_values, log_pi=log_pi, ratio=ratio,
+                                                           surrogate1=surrogate1, surrogate2=surrogate2,
+                                                           entropy=entropy,
+                                                           value_pred_i=value_pred_i, value_target=value_target,
+                                                           values_i=values_i, loss_v=loss_v))
+
         loss = sum(loss_a) + self.vf_coef * sum(loss_c) - self.ent_coef * sum(loss_e)
         self.optimizer.zero_grad()
         loss.backward()
@@ -248,5 +270,7 @@ class MAPPO_Clip_Learner(IPPO_Learner):
             "learning_rate": lr,
             "loss": loss.item(),
         })
+
+        info.update(self.callback.on_update_end(self.iterations, method="update_rnn", policy=self.policy, info=info))
 
         return info

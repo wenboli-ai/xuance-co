@@ -3,8 +3,13 @@ from torch import optim
 import torch
 import torch.nn as nn
 from xuance.torch.learners import Learner
-from torchvision import transforms
 import torch.nn.functional as F
+try:
+    from torchvision import transforms
+except:
+    pass
+
+
 class FrameStackTransform:
     def __init__(self):
         self.transform = transforms.Compose([
@@ -28,8 +33,8 @@ class FrameStackTransform:
 
 class SPR_Learner(Learner):
 
-    def __init__(self, config, policy, temperature=0.1, tau=0.99, repr_lr=1e-4, prediction_steps=3):
-        super().__init__(config, policy)
+    def __init__(self, config, policy, callback, temperature=0.1, tau=0.99, repr_lr=1e-4, prediction_steps=3):
+        super().__init__(config, policy, callback)
         self.temperature = temperature
         self.tau = tau
         self.prediction_steps = prediction_steps
@@ -72,6 +77,9 @@ class SPR_Learner(Learner):
         next_obs = torch.as_tensor(samples['obs_next'], device=self.device)
         rew = torch.as_tensor(samples['rewards'], device=self.device)
         done = torch.as_tensor(samples['terminals'], dtype=torch.float, device=self.device)
+        info = self.callback.on_update_start(self.iterations,
+                                             policy=self.policy, obs=obs, act=actions,
+                                             next_obs=next_obs, rew=rew, termination=done)
 
         spr_loss = self._compute_contrastive_loss(obs, actions)
         self.encoder_optim.zero_grad()
@@ -83,8 +91,8 @@ class SPR_Learner(Learner):
 
         _, _, evalQ = self.policy(obs)
         _, _, targetQ = self.policy.target(next_obs)
-        targetQ = rew + self.gamma * (1 - done) * targetQ.max(dim=1).values
-        q_loss = self.mse_loss(evalQ.gather(1, actions.long().unsqueeze(1)).squeeze(), targetQ)
+        predictQ = rew + self.gamma * (1 - done) * targetQ.max(dim=1).values
+        q_loss = self.mse_loss(evalQ.gather(1, actions.long().unsqueeze(1)).squeeze(), predictQ)
 
         self.q_optim.zero_grad()
         q_loss.backward()
@@ -92,9 +100,16 @@ class SPR_Learner(Learner):
             torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.grad_clip_norm)
         self.q_optim.step()
 
-        print("spr_loss:", spr_loss.item(), "q_loss:", q_loss.item())
-        return {
+        # print("spr_loss:", spr_loss.item(), "q_loss:", q_loss.item())
+        info.update({
             "spr_loss": spr_loss.item(),
             "q_loss": q_loss.item(),
             "learning_rate": self.q_optim.param_groups[0]['lr']
-        }
+        })
+
+        info.update(self.callback.on_update_end(self.iterations,
+                                                policy=self.policy, info=info,
+                                                spr_loss=spr_loss, q_loss=q_loss,
+                                                evalQ=evalQ, predictQ=predictQ, targetQ=targetQ))
+
+        return info

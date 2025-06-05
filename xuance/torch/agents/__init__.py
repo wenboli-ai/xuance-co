@@ -1,5 +1,6 @@
+from .base.callback import BaseCallback, MultiAgentBaseCallback
 from .base import Agent, MARLAgents, RandomAgents
-from .core import OnPolicyAgent, OffPolicyAgent, OffPolicyMARLAgents, OnPolicyMARLAgents
+from .core import OnPolicyAgent, OffPolicyAgent, OffPolicyMARLAgents, OnPolicyMARLAgents, OfflineAgent
 
 '''Single-Agent Reinforcement Learning algorithms'''
 from .policy_gradient import PG_Agent
@@ -37,7 +38,6 @@ from .multi_agent_rl import DCG_Agents
 from .multi_agent_rl import IAC_Agents
 from .multi_agent_rl import VDAC_Agents
 from .multi_agent_rl import COMA_Agents
-from .multi_agent_rl import IC3Net_Agents
 from .multi_agent_rl import IDDPG_Agents
 from .multi_agent_rl import MADDPG_Agents
 from .multi_agent_rl import MFQ_Agents
@@ -47,7 +47,10 @@ from .multi_agent_rl import MAPPO_Agents
 from .multi_agent_rl import ISAC_Agents
 from .multi_agent_rl import MASAC_Agents
 from .multi_agent_rl import MATD3_Agents
+
 from .multi_agent_rl import CommNet_Agents
+from .multi_agent_rl import IC3Net_Agents
+from .multi_agent_rl import TarMAC_Agents
 
 from .offline_rl import TD3_BC_Agent
 
@@ -102,6 +105,7 @@ REGISTRY_Agents = {
     "MATD3": MATD3_Agents,
     "IC3Net": IC3Net_Agents,
     "CommNet": CommNet_Agents,
+    "TarMAC": TarMAC_Agents,
 
     "TD3BC": TD3_BC_Agent,
 
@@ -111,9 +115,9 @@ REGISTRY_Agents = {
 }
 
 __all__ = [
-    "Agent", "MARLAgents", "RandomAgents",
+    "BaseCallback", "Agent", "MARLAgents", "RandomAgents",
 
-    "OnPolicyAgent", "OffPolicyAgent", "OffPolicyMARLAgents", "OnPolicyMARLAgents",
+    "OnPolicyAgent", "OffPolicyAgent", "OffPolicyMARLAgents", "OnPolicyMARLAgents", "OfflineAgent",
 
     "REGISTRY_Agents",
 
@@ -124,7 +128,8 @@ __all__ = [
     "DreamerV2Agent", "DreamerV3Agent",
 
     "IQL_Agents", "VDN_Agents", "QMIX_Agents", "WQMIX_Agents", "QTRAN_Agents", "DCG_Agents",
-    "IAC_Agents", "VDAC_Agents", "COMA_Agents", "IDDPG_Agents", "MADDPG_Agents", "IC3Net_Agents", "CommNet_Agents",
+    "IAC_Agents", "VDAC_Agents", "COMA_Agents", "IDDPG_Agents", "MADDPG_Agents",
+    "IC3Net_Agents", "CommNet_Agents", "TarMAC_Agents",
     "MFQ_Agents", "MFAC_Agents", "IPPO_Agents", "MAPPO_Agents",
     "ISAC_Agents", "MASAC_Agents", "MATD3_Agents",
 

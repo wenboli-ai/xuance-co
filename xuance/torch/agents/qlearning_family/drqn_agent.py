@@ -3,12 +3,12 @@ import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 from argparse import Namespace
-from xuance.common import Union
+from xuance.common import Union, Optional
 from xuance.environment import DummyVecEnv, SubprocVecEnv
 from xuance.torch import Module
 from xuance.torch.utils import NormalizeFunctions, ActivationFunctions
 from xuance.torch.policies import REGISTRY_Policy
-from xuance.torch.agents import OffPolicyAgent
+from xuance.torch.agents import OffPolicyAgent, BaseCallback
 from xuance.common import RecurrentOffPolicyBuffer, EpisodeBuffer
 
 
@@ -22,8 +22,9 @@ class DRQN_Agent(OffPolicyAgent):
 
     def __init__(self,
                  config: Namespace,
-                 envs: Union[DummyVecEnv, SubprocVecEnv]):
-        super(DRQN_Agent, self).__init__(config, envs)
+                 envs: Union[DummyVecEnv, SubprocVecEnv],
+                 callback: Optional[BaseCallback] = None):
+        super(DRQN_Agent, self).__init__(config, envs, callback)
 
         self.start_greedy, self.end_greedy = config.start_greedy, config.end_greedy
         self.egreedy = config.start_greedy
@@ -32,7 +33,7 @@ class DRQN_Agent(OffPolicyAgent):
         self.policy = self._build_policy()  # build policy
         self.auxiliary_info_shape = {}
         self.memory = self._build_memory(auxiliary_info_shape=self.auxiliary_info_shape)  # build memory
-        self.learner = self._build_learner(self.config, self.policy)  # build learner
+        self.learner = self._build_learner(self.config, self.policy, self.callback)  # build learner
         self.lstm = True if config.rnn == "LSTM" else False
 
     def _build_memory(self, auxiliary_info_shape=None):
@@ -92,7 +93,7 @@ class DRQN_Agent(OffPolicyAgent):
             obs = self._process_observation(obs)
             policy_out = self.action(obs, self.egreedy, self.rnn_hidden)
             acts, self.rnn_hidden = policy_out['actions'], policy_out['rnn_hidden_next']
-            next_obs, rewards, terminals, trunctions, infos = self.envs.step(acts)
+            next_obs, rewards, terminals, truncations, infos = self.envs.step(acts)
 
             if (self.current_step > self.start_training) and (self.current_step % self.training_frequency == 0):
                 # training
@@ -103,8 +104,8 @@ class DRQN_Agent(OffPolicyAgent):
             for i in range(self.n_envs):
                 episode_data[i].put(
                     [self._process_observation(obs[i]), acts[i], self._process_reward(rewards[i]), terminals[i]])
-                if terminals[i] or trunctions[i]:
-                    if self.atari and (~trunctions[i]):
+                if terminals[i] or truncations[i]:
+                    if self.atari and (~truncations[i]):
                         pass
                     else:
                         self.rnn_hidden = self.policy.init_hidden_item(self.rnn_hidden, i)
@@ -146,7 +147,7 @@ class DRQN_Agent(OffPolicyAgent):
             obs = self._process_observation(obs)
             policy_out = self.action(obs, egreedy=0.0, rnn_hidden=rnn_hidden)
             acts, rnn_hidden = policy_out['actions'], policy_out['rnn_hidden_next']
-            next_obs, rewards, terminals, trunctions, infos = test_envs.step(acts)
+            next_obs, rewards, terminals, truncations, infos = test_envs.step(acts)
             if self.config.render_mode == "rgb_array" and self.render:
                 images = test_envs.render(self.config.render_mode)
                 for idx, img in enumerate(images):
@@ -154,8 +155,8 @@ class DRQN_Agent(OffPolicyAgent):
 
             obs = deepcopy(next_obs)
             for i in range(num_envs):
-                if terminals[i] or trunctions[i]:
-                    if self.atari and (~trunctions[i]):
+                if terminals[i] or truncations[i]:
+                    if self.atari and (~truncations[i]):
                         pass
                     else:
                         obs[i] = infos[i]["reset_obs"]

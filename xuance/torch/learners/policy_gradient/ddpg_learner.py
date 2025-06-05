@@ -12,8 +12,9 @@ from argparse import Namespace
 class DDPG_Learner(Learner):
     def __init__(self,
                  config: Namespace,
-                 policy: nn.Module):
-        super(DDPG_Learner, self).__init__(config, policy)
+                 policy: nn.Module,
+                 callback):
+        super(DDPG_Learner, self).__init__(config, policy, callback)
         self.optimizer = {
             'actor': torch.optim.Adam(self.policy.actor_parameters, self.config.learning_rate_actor),
             'critic': torch.optim.Adam(self.policy.critic_parameters, self.config.learning_rate_critic)}
@@ -37,6 +38,9 @@ class DDPG_Learner(Learner):
         next_batch = torch.as_tensor(samples['obs_next'], device=self.device)
         rew_batch = torch.as_tensor(samples['rewards'], device=self.device)
         ter_batch = torch.as_tensor(samples['terminals'], dtype=torch.float, device=self.device)
+        info = self.callback.on_update_start(self.iterations,
+                                             policy=self.policy, obs=obs_batch, act=act_batch,
+                                             next_obs=next_batch, rew=rew_batch, termination=ter_batch)
 
         # critic update
         action_q = self.policy.Qaction(obs_batch, act_batch).reshape([-1])
@@ -68,20 +72,23 @@ class DDPG_Learner(Learner):
         critic_lr = self.optimizer['critic'].state_dict()['param_groups'][0]['lr']
 
         if self.distributed_training:
-            info = {
+            info.update({
                 f"Qloss/rank_{self.rank}": q_loss.item(),
                 f"Ploss/rank_{self.rank}": p_loss.item(),
                 f"Qvalue/rank_{self.rank}": action_q.mean().item(),
                 f"actor_lr/rank_{self.rank}": actor_lr,
                 f"critic_lr/rank_{self.rank}": critic_lr
-            }
+            })
         else:
-            info = {
+            info.update({
                 "Qloss": q_loss.item(),
                 "Ploss": p_loss.item(),
                 "Qvalue": action_q.mean().item(),
                 "actor_lr": actor_lr,
                 "critic_lr": critic_lr
-            }
-
+            })
+        info.update(self.callback.on_update_end(self.iterations,
+                                                policy=self.policy, info=info,
+                                                action_q=action_q, next_q=next_q, target_q=target_q, policy_q=policy_q,
+                                                q_loss=q_loss, p_loss=p_loss))
         return info

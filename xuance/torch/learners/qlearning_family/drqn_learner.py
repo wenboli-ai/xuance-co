@@ -12,8 +12,9 @@ from argparse import Namespace
 class DRQN_Learner(Learner):
     def __init__(self,
                  config: Namespace,
-                 policy: nn.Module):
-        super(DRQN_Learner, self).__init__(config, policy)
+                 policy: nn.Module,
+                 callback):
+        super(DRQN_Learner, self).__init__(config, policy, callback)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), self.config.learning_rate, eps=1e-5)
         self.scheduler = torch.optim.lr_scheduler.LinearLR(self.optimizer,
                                                            start_factor=1.0,
@@ -32,6 +33,9 @@ class DRQN_Learner(Learner):
         rew_batch = torch.as_tensor(samples['rewards'], device=self.device)
         ter_batch = torch.as_tensor(samples['terminals'], dtype=torch.float, device=self.device)
         batch_size = samples['batch_size']
+        info = self.callback.on_update_start(self.iterations,
+                                             policy=self.policy, obs=obs_batch, act=act_batch,
+                                             rew=rew_batch, termination=ter_batch, batch_size=batch_size)
 
         rnn_hidden = self.policy.init_hidden(batch_size)
         _, _, evalQ, _ = self.policy(obs_batch[:, 0:-1], *rnn_hidden)
@@ -60,16 +64,19 @@ class DRQN_Learner(Learner):
         lr = self.optimizer.state_dict()['param_groups'][0]['lr']
 
         if self.distributed_training:
-            info = {
+            info.update({
                 f"Qloss/rank_{self.rank}": loss.item(),
                 f"learning_rate/rank_{self.rank}": lr,
                 f"predictQ/rank_{self.rank}": predictQ.mean().item()
-            }
+            })
         else:
-            info = {
+            info.update({
                 "Qloss": loss.item(),
                 "learning_rate": lr,
                 "predictQ": predictQ.mean().item()
-            }
-
+            })
+        info.update(self.callback.on_update_end(self.iterations,
+                                                policy=self.policy, info=info,
+                                                evalQ=evalQ, predictQ=predictQ, targetA=targetA, targetQ=targetQ,
+                                                loss=loss))
         return info

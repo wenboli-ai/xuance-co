@@ -3,12 +3,12 @@ import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 from argparse import Namespace
-from xuance.common import Union
+from xuance.common import Union, Optional
 from xuance.environment import DummyVecEnv, SubprocVecEnv
 from xuance.torch import Module
 from xuance.torch.utils import NormalizeFunctions, ActivationFunctions
 from xuance.torch.policies import REGISTRY_Policy
-from xuance.torch.agents import OnPolicyAgent
+from xuance.torch.agents import OnPolicyAgent, BaseCallback
 from xuance.torch.utils import split_distributions
 
 
@@ -21,8 +21,9 @@ class PPG_Agent(OnPolicyAgent):
     """
     def __init__(self,
                  config: Namespace,
-                 envs: Union[DummyVecEnv, SubprocVecEnv]):
-        super(PPG_Agent, self).__init__(config, envs)
+                 envs: Union[DummyVecEnv, SubprocVecEnv],
+                 callback: Optional[BaseCallback] = None):
+        super(PPG_Agent, self).__init__(config, envs, callback)
         self.policy_nepoch = config.policy_nepoch
         self.value_nepoch = config.value_nepoch
         self.aux_nepoch = config.aux_nepoch
@@ -30,7 +31,7 @@ class PPG_Agent(OnPolicyAgent):
         self.auxiliary_info_shape = {"old_dist": None}
         self.memory = self._build_memory(self.auxiliary_info_shape)  # build memory
         self.policy = self._build_policy()  # build policy
-        self.learner = self._build_learner(self.config, self.policy)  # build learner.
+        self.learner = self._build_learner(self.config, self.policy, self.callback)  # build learner.
 
     def _build_policy(self) -> Module:
         normalize_fn = NormalizeFunctions[self.config.normalize] if hasattr(self.config, "normalize") else None
@@ -103,7 +104,7 @@ class PPG_Agent(OnPolicyAgent):
             obs = self._process_observation(obs)
             policy_out = self.action(obs, return_dists=True, return_logpi=False)
             acts, rets = policy_out['actions'], policy_out['values']
-            next_obs, rewards, terminals, trunctions, infos = self.envs.step(acts)
+            next_obs, rewards, terminals, truncations, infos = self.envs.step(acts)
             aux_info = self.get_aux_info(policy_out)
             self.memory.store(obs, acts, self._process_reward(rewards), rets, terminals, aux_info)
             if self.memory.full:
@@ -150,10 +151,10 @@ class PPG_Agent(OnPolicyAgent):
             self.returns = self.gamma * self.returns + rewards
             obs = deepcopy(next_obs)
             for i in range(self.n_envs):
-                if terminals[i] or trunctions[i]:
+                if terminals[i] or truncations[i]:
                     self.ret_rms.update(self.returns[i:i + 1])
                     self.returns[i] = 0.0
-                    if self.atari and (~trunctions[i]):
+                    if self.atari and (~truncations[i]):
                         pass
                     else:
                         if terminals[i]:

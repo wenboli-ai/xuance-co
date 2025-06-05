@@ -1,10 +1,10 @@
 from tqdm import tqdm
 from copy import deepcopy
 from argparse import Namespace
-from xuance.common import Union
+from xuance.common import Union, Optional, PerOffPolicyBuffer
 from xuance.environment import DummyVecEnv, SubprocVecEnv
+from xuance.torch.agents import BaseCallback
 from xuance.torch.agents.qlearning_family import DQN_Agent
-from xuance.common import PerOffPolicyBuffer
 
 
 class PerDQN_Agent(DQN_Agent):
@@ -17,8 +17,9 @@ class PerDQN_Agent(DQN_Agent):
 
     def __init__(self,
                  config: Namespace,
-                 envs: Union[DummyVecEnv, SubprocVecEnv]):
-        super(PerDQN_Agent, self).__init__(config, envs)
+                 envs: Union[DummyVecEnv, SubprocVecEnv],
+                 callback: Optional[BaseCallback] = None):
+        super(PerDQN_Agent, self).__init__(config, envs, callback)
         self.PER_beta0 = config.PER_beta0
         self.PER_beta = config.PER_beta0
 
@@ -32,7 +33,7 @@ class PerDQN_Agent(DQN_Agent):
                                          buffer_size=config.buffer_size,
                                          batch_size=config.batch_size,
                                          alpha=config.PER_alpha)
-        self.learner = self._build_learner(self.config, self.policy)
+        self.learner = self._build_learner(self.config, self.policy, self.callback)
 
     def train_epochs(self, n_epochs=1):
         train_info = {}
@@ -51,7 +52,7 @@ class PerDQN_Agent(DQN_Agent):
             obs = self._process_observation(obs)
             policy_out = self.action(obs, test_mode=False)
             acts = policy_out['actions']
-            next_obs, rewards, terminals, trunctions, infos = self.envs.step(acts)
+            next_obs, rewards, terminals, truncations, infos = self.envs.step(acts)
 
             self.memory.store(obs, acts, self._process_reward(rewards), terminals, self._process_observation(next_obs))
             if self.current_step > self.start_training and self.current_step % self.training_frequency == 0:
@@ -61,8 +62,8 @@ class PerDQN_Agent(DQN_Agent):
 
             obs = deepcopy(next_obs)
             for i in range(self.n_envs):
-                if terminals[i] or trunctions[i]:
-                    if self.atari and (~trunctions[i]):
+                if terminals[i] or truncations[i]:
+                    if self.atari and (~truncations[i]):
                         pass
                     else:
                         obs[i] = infos[i]["reset_obs"]

@@ -12,8 +12,9 @@ from argparse import Namespace
 class MPDQN_Learner(Learner):
     def __init__(self,
                  config: Namespace,
-                 policy: nn.Module):
-        super(MPDQN_Learner, self).__init__(config, policy)
+                 policy: nn.Module,
+                 callback):
+        super(MPDQN_Learner, self).__init__(config, policy, callback)
         conactor_optimizer = torch.optim.Adam(self.policy.conactor.parameters(), self.config.learning_rate)
         qnetwork_optimizer = torch.optim.Adam(self.policy.qnetwork.parameters(), self.config.learning_rate)
         self.optimizers = [conactor_optimizer, qnetwork_optimizer]
@@ -39,6 +40,10 @@ class MPDQN_Learner(Learner):
         ter_batch = torch.as_tensor(samples['terminals'], dtype=torch.float, device=self.device)
         disact_batch = hyact_batch[:, 0].long()
         conact_batch = hyact_batch[:, 1:]
+        info = self.callback.on_update_start(self.iterations,
+                                             policy=self.policy, obs=obs_batch, hyact_batch=hyact_batch,
+                                             disact_batch=disact_batch, conact_batch=conact_batch,
+                                             next_obs=next_batch, rew=rew_batch, termination=ter_batch)
 
         # optimize Q-network
         with torch.no_grad():
@@ -70,16 +75,20 @@ class MPDQN_Learner(Learner):
         self.policy.soft_update(self.tau)
 
         if self.distributed_training:
-            info = {
+            info.update({
                 f"Q_loss/rank_{self.rank}": q_loss.item(),
                 f"P_loss/rank_{self.rank}": q_loss.item(),
                 f"Qvalue/rank_{self.rank}": eval_q.mean().item()
-            }
+            })
         else:
-            info = {
+            info.update({
                 "Q_loss": q_loss.item(),
                 "P_loss": q_loss.item(),
                 "Qvalue": eval_q.mean().item()
-            }
-
+            })
+        info.update(self.callback.on_update_end(self.iterations,
+                                                policy=self.policy, scheduler=self.scheduler, info=info,
+                                                target_conact=target_conact, target_q=target_q,
+                                                eval_qs=eval_qs, eval_q=eval_q, policy_q=policy_q,
+                                                q_loss=q_loss, p_loss=p_loss))
         return info
