@@ -51,6 +51,8 @@ from .multi_agent_rl import CommNet_Agents
 
 from .offline_rl import TD3_BC_Agent
 
+from .contrastive_unsupervised_rl import CURL_Agent, SPR_Agent, DrQ_Agent
+
 REGISTRY_Agents = {
     "PG": PG_Agent,
     "A2C": A2C_Agent,
@@ -102,6 +104,10 @@ REGISTRY_Agents = {
     "CommNet": CommNet_Agents,
 
     "TD3BC": TD3_BC_Agent,
+
+    "CURL":  CURL_Agent,
+    "SPR":  SPR_Agent,
+    "DrQ": DrQ_Agent,
 }
 
 __all__ = [
@@ -123,4 +129,6 @@ __all__ = [
     "ISAC_Agents", "MASAC_Agents", "MATD3_Agents",
 
     "TD3_BC_Agent",
+
+    "CURL_Agent", "SPR_Agent", "DrQ_Agent"
 ]

@@ -116,8 +116,9 @@
 - **CommNet**: Communication Neural Net [[Paper](https://proceedings.neurips.cc/paper_files/paper/2016/file/55b1927fdafef39c48e5b73b5d61ea60-Paper.pdf)][[源码](https://github.com/cts198859/deeprl_network.git)]
 
 ### :point_right: Contrastive Reinforcement Learning (CRL)
-- **CURL**: Contrastive Unsupervised Representation Learning for Sample-Efficient Reinforcement Learning [[Paper](http://proceedings.mlr.press/v119/laskin20a/laskin20a.pdf)] [[源码](https://github.com/MishaLaskin/curl/blob/master/curl_sac.py)]
-- **SPR**: Data-Efficient Reinforcement Learning with Self-Predictive Representations [[Paper]](https://arxiv.org/abs/2007.05929) [[源码]](https://github.com/mila-iqia/spr)
+- **CURL**: Contrastive Unsupervised Representation Learning for Sample-Efficient Reinforcement Learning [[论文](http://proceedings.mlr.press/v119/laskin20a/laskin20a.pdf)] [[源码](https://github.com/MishaLaskin/curl/blob/master/curl_sac.py)]
+- **SPR**: Data-Efficient Reinforcement Learning with Self-Predictive Representations [[论文]](https://arxiv.org/abs/2007.05929) [[源码]](https://github.com/mila-iqia/spr)
+- **DrQ**: Image Augmentation Is All You Need: Regularizing Deep Reinforcement Learning from Pixels [[论文]](https://openreview.net/forum?id=GY6-6sTvGaf) [[源码]](https://sites.google.com/view/data-regularized-q)
 
 ## 已支持环境
 
