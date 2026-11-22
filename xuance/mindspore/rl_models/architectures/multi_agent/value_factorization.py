@@ -314,7 +314,7 @@ class QTranMixingNetwork(MixingQNetwork):
                                                  use_rnn=use_rnn,
                                                  use_distributed_training=use_distributed_training,
                                                  **kwargs)
-        self.n_actions = {k: self.individual_q_networks[k].action_space.n for k in self.group_keys}
+        self.n_actions = {k: int(self.individual_q_networks[k].action_space.n) for k in self.group_keys}
         self.n_actions_max = max(self.n_actions.values())
 
         self.qtran_net = qtran_mixer

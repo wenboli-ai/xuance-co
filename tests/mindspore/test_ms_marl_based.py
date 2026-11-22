@@ -7,12 +7,15 @@ import unittest
 
 run_mode = "benchmark"  # Choices: "train", "test", "benchmark"
 
-running_steps = 10000
-eval_interval = 5000
+running_steps = 200
+eval_interval = 100
 device = 'GPU'
 test_mode = False
 args = Namespace(dl_toolbox='mindspore', device=device,
-                 running_steps=running_steps, eval_interval=eval_interval)
+                 running_steps=running_steps, eval_interval=eval_interval,
+                 vectorize="DummyVecMultiAgentEnv", parallels=2,
+                 buffer_size=32, batch_size=8, start_training=50,
+                 n_epochs=1, n_minibatch=1, test_episode=1, render=False)
 args.static_graph = False
 env_name = "mpe"
 env_id = "simple_spread_v3"
@@ -90,7 +93,9 @@ class TestMARL_Algo(unittest.TestCase):
         args_continuous = deepcopy(args)
         args_continuous.continuous_action = False
         args_continuous.policy = "Categorical_MAAC_Policy"
-        runner = get_runner(algo="mappo", env=env_name, env_id=env_id, parser_args=args)
+        args_subproc = deepcopy(args)
+        args_subproc.vectorize = "SubprocVecMultiAgentEnv"
+        runner = get_runner(algo="mappo", env=env_name, env_id=env_id, parser_args=args_subproc)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     def test_masac(self):

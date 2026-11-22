@@ -22,7 +22,7 @@ class QTRAN_Learner(OffPolicyMultiAgentLearner):
                  callback):
         super(QTRAN_Learner, self).__init__(config, agent_grouping, model, callback)
         self.sync_frequency = config.sync_frequency
-        self.n_actions = {k: self.model.individual_q_networks[k].action_space.n for k in self.group_keys}
+        self.n_actions = {k: int(self.model.individual_q_networks[k].action_space.n) for k in self.group_keys}
         # Get gradient function
         self.grad_fn = ms.value_and_grad(self.forward_fn, None, self.optimizer.parameters, has_aux=True)
         self.model.set_train()

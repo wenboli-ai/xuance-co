@@ -7,12 +7,15 @@ import unittest
 
 run_mode = "benchmark"  # Choices: "train", "test", "benchmark"
 
-running_steps = 10000
-eval_interval = 5000
+running_steps = 400
+eval_interval = 200
 device = 'CPU'
 test_mode = False
 args = Namespace(dl_toolbox='mindspore', device=device,
-                 running_steps=running_steps, eval_interval=eval_interval)
+                 running_steps=running_steps, eval_interval=eval_interval,
+                 parallels=4, horizon_size=32, n_epochs=1, n_minibatch=1,
+                 buffer_size=400, batch_size=16, start_training=100,
+                 test_episode=1, render=False)
 env_name = "classic_control"
 env_id_continuous = "Pendulum-v1"
 env_id_discrete = "CartPole-v1"
@@ -58,11 +61,19 @@ class TestPolicyBaseAlgo(unittest.TestCase):
 
     """PPG"""
     def test_ppg_continuous(self):
-        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_continuous, parser_args=args)
+        args_ppg = deepcopy(args)
+        args_ppg.policy_nepoch = 1
+        args_ppg.value_nepoch = 1
+        args_ppg.aux_nepoch = 1
+        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_continuous, parser_args=args_ppg)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     def test_ppg_discrete(self):
-        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_discrete, parser_args=args)
+        args_ppg = deepcopy(args)
+        args_ppg.policy_nepoch = 1
+        args_ppg.value_nepoch = 1
+        args_ppg.aux_nepoch = 1
+        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_discrete, parser_args=args_ppg)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """PPO"""

@@ -1,17 +1,24 @@
 # Test the policy-based algorithms with TensorFlow.
 
 from argparse import Namespace
+from copy import deepcopy
+import importlib.util
 from xuance import get_runner
 import unittest
 
+HAS_GYM_PLATFORM = importlib.util.find_spec("gym_platform") is not None
+
 run_mode = "benchmark"  # Choices: "train", "test", "benchmark"
 
-running_steps = 10000
-eval_interval = 5000
+running_steps = 400
+eval_interval = 200
 device = 'CPU'
 test_mode = False
 args = Namespace(dl_toolbox='tensorflow', device=device,
-                 running_steps=running_steps, eval_interval=eval_interval)
+                 running_steps=running_steps, eval_interval=eval_interval,
+                 parallels=4, horizon_size=32, n_epochs=1, n_minibatch=1,
+                 buffer_size=400, batch_size=16, start_training=100,
+                 test_episode=1, render=False)
 env_name = "classic_control"
 env_id_continuous = "Pendulum-v1"
 env_id_discrete = "CartPole-v1"
@@ -34,18 +41,21 @@ class TestPolicyBaseAlgo(unittest.TestCase):
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """P-DQN"""
+    @unittest.skipUnless(HAS_GYM_PLATFORM, "gym_platform is not installed")
     def test_pdqn(self):
-        runner = get_runner(algo="pdqn", env='platform', env_id='Platform-v1', parser_args=args)
+        runner = get_runner(algo="pdqn", env='Platform', env_id='Platform-v0', parser_args=args)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """MP-DQN"""
+    @unittest.skipUnless(HAS_GYM_PLATFORM, "gym_platform is not installed")
     def test_mpdqn(self):
-        runner = get_runner(algo="mpdqn", env='platform', env_id='Platform-v1', parser_args=args)
+        runner = get_runner(algo="mpdqn", env='Platform', env_id='Platform-v0', parser_args=args)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """SP-DQN"""
+    @unittest.skipUnless(HAS_GYM_PLATFORM, "gym_platform is not installed")
     def test_spdqn(self):
-        runner = get_runner(algo="spdqn", env='platform', env_id='Platform-v1', parser_args=args)
+        runner = get_runner(algo="spdqn", env='Platform', env_id='Platform-v0', parser_args=args)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """NPG"""
@@ -68,11 +78,19 @@ class TestPolicyBaseAlgo(unittest.TestCase):
 
     """PPG"""
     def test_ppg_continuous(self):
-        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_continuous, parser_args=args)
+        args_ppg = deepcopy(args)
+        args_ppg.policy_nepoch = 1
+        args_ppg.value_nepoch = 1
+        args_ppg.aux_nepoch = 1
+        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_continuous, parser_args=args_ppg)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     def test_ppg_discrete(self):
-        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_discrete, parser_args=args)
+        args_ppg = deepcopy(args)
+        args_ppg.policy_nepoch = 1
+        args_ppg.value_nepoch = 1
+        args_ppg.aux_nepoch = 1
+        runner = get_runner(algo="ppg", env=env_name, env_id=env_id_discrete, parser_args=args_ppg)
         runner.run(mode=run_mode, running_steps=running_steps, eval_interval=eval_interval)
 
     """PPO"""
